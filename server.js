@@ -36,7 +36,7 @@ const sqlConfig = {
         database: 'MechaSCADA_V2',
         encrypt: true,
         trustServerCertificate: true,
-        port: 1433 // Cổng SQL chuẩn kết nối Internet
+        port: 1433, // Cổng SQL chuẩn kết nối Internet
         rowCollectionOnRequestCompletion: true // Bắt buộc phải có để nhận dữ liệu dạng mảng như cũ, tránh lỗi "Cannot read properties of undefined (reading 'forEach')"
     }
 };

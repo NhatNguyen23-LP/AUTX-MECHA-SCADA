@@ -37,9 +37,11 @@ const sqlConfig = {
         encrypt: true,
         trustServerCertificate: true,
         port: 1433 // Cổng SQL chuẩn kết nối Internet
+        rowCollectionOnRequestCompletion: true // Bắt buộc phải có để nhận dữ liệu dạng mảng như cũ, tránh lỗi "Cannot read properties of undefined (reading 'forEach')"
     }
 };
 
+// ✅ 3. TẠO HÀM GIẢ LẬP ĐỂ GIỮ NGUYÊN CÁC LỆNH .request().query() CŨ CỦA NHẬT
 // ✅ 3. TẠO HÀM GIẢ LẬP ĐỂ GIỮ NGUYÊN CÁC LỆNH .request().query() CŨ CỦA NHẬT
 const poolPromise = new Promise((resolve, reject) => {
     const connection = new sql.Connection(sqlConfig);
@@ -50,36 +52,49 @@ const poolPromise = new Promise((resolve, reject) => {
         } else {
             console.log('✅ LH_AUTX: Hệ thống đã thông mạch SQL Server Cloud!');
             
-            // Bộ chuyển đổi thích nghi để các API cũ của ní không bị lỗi cú pháp
-            const requestAdapter = () => ({
-                input: function(name, type, val) { 
-                    this.params = this.params || []; 
-                    this.params.push({ name, val }); 
-                    return this; 
-                },
-                query: function(sqlStr) {
-                    return new Promise((resQ, rejQ) => {
-                        let req = new sql.Request(sqlStr, (err, rowCount, rows) => {
-                            if (err) return rejQ(err);
-                            let recordset = rows.map(row => {
-                                let obj = {};
-                                row.forEach(col => { obj[col.metadata.colName] = col.value; });
-                                return obj;
+            // Bộ chuyển đổi thích nghi Master giúp các API cũ không bị crash biến hệ thống
+            const requestAdapter = () => {
+                let params = []; // Khởi tạo mảng lưu trữ tham số cục bộ cho mỗi request
+                return {
+                    input: function(name, type, val) { 
+                        params.push({ name, val }); 
+                        return this; 
+                    },
+                    query: function(sqlStr) {
+                        return new Promise((resQ, rejQ) => {
+                            // Vá lỗi kén kiểu dữ liệu của thư viện cũ mssql sang tedious
+                            sql.NVarChar = sql.NVarChar || 'NVarChar';
+                            sql.UniqueIdentifier = sql.UniqueIdentifier || 'UniqueIdentifier';
+                            sql.VarChar = sql.VarChar || 'VarChar';
+                            sql.Date = sql.Date || 'Date';
+                            sql.Float = sql.Float || 'Float';
+                            sql.Int = sql.Int || 'Int';
+
+                            let req = new sql.Request(sqlStr, (err, rowCount, rows) => {
+                                if (err) return rejQ(err);
+                                let recordset = rows.map(row => {
+                                    let obj = {};
+                                    row.forEach(col => { obj[col.metadata.colName] = col.value; });
+                                    return obj;
+                                });
+                                resQ({ recordset });
                             });
-                            resQ({ recordset });
+                            
+                            // Nạp các tham số động đã được lưu lại từ hàm .input()
+                            if (params && params.length > 0) { 
+                                params.forEach(p => req.addParameter(p.name, sql.TYPES.NVarChar, p.val)); 
+                            }
+                            connection.execSql(req);
                         });
-                        if (this.params) { 
-                            this.params.forEach(p => req.addParameter(p.name, sql.TYPES.NVarChar, p.val)); 
-                        }
-                        connection.execSql(req);
-                    });
-                }
-            });
+                    }
+                };
+            };
             resolve({ request: requestAdapter });
         }
     });
     connection.connect();
 });
+
 
 // --- 3. Chốt chặn bảo mật (Bản Master "Phá Đảo" cho ní Nhật) ---
 app.use((req, res, next) => {

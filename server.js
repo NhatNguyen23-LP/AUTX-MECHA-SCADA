@@ -1,5 +1,5 @@
 const express = require('express');
-const sql = require('mssql/msnodesqlv8'); 
+const sql = require('tedious');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
@@ -22,16 +22,64 @@ app.use(session({
     cookie: { maxAge: 3600000 }
 }));
 
-// --- 2. Kết nối SQL Server (Instance: SQLNHATTD) ---
-// ✅ CẬP NHẬT LẠI ĐOẠN ĐÃ FIX CÚ PHÁP ĐƯỜNG TRUYỀN SOMEE:
+// ✅ 2. CẤU HÌNH ĐƯỜNG TRUYỀN CHO THƯ VIỆN TEDIOUS CHỌC LÊN SOMEE
 const sqlConfig = {
-    connectionString: "Driver={ODBC Driver 17 for SQL Server};Server=MechaSCADA_V2.mssql.somee.com;Database=MechaSCADA_V2;UID=NhatLPN23_SQLLogin_1;PWD=7ap8sb7rwb;TrustServerCertificate=yes;",
-    options: { enableArithAbort: true, trustServerCertificate: true }
+    authentication: {
+        type: 'default',
+        options: {
+            userName: 'NhatLPN23_SQLLogin_1',
+            password: '' // 🌟 Dán mật khẩu ní copy trên web Somee vô đây
+        }
+    },
+    server: 'MechaSCADA_V2.mssql.somee.com',
+    options: {
+        database: 'MechaSCADA_V2',
+        encrypt: true,
+        trustServerCertificate: true,
+        port: 1433 // Cổng SQL chuẩn kết nối Internet
+    }
 };
 
-const poolPromise = new sql.ConnectionPool(sqlConfig).connect()
-    .then(pool => { console.log('✅ LH_AUTX: Hệ thống đã thông mạch SQL Server!'); return pool; })
-    .catch(err => console.error('❌ Lỗi kết nối:', err.message));
+// ✅ 3. TẠO HÀM GIẢ LẬP ĐỂ GIỮ NGUYÊN CÁC LỆNH .request().query() CŨ CỦA NHẬT
+const poolPromise = new Promise((resolve, reject) => {
+    const connection = new sql.Connection(sqlConfig);
+    connection.on('connect', err => {
+        if (err) {
+            console.error('❌ Lỗi kết nối Somee:', err.message);
+            reject(err);
+        } else {
+            console.log('✅ LH_AUTX: Hệ thống đã thông mạch SQL Server Cloud!');
+            
+            // Bộ chuyển đổi thích nghi để các API cũ của ní không bị lỗi cú pháp
+            const requestAdapter = () => ({
+                input: function(name, type, val) { 
+                    this.params = this.params || []; 
+                    this.params.push({ name, val }); 
+                    return this; 
+                },
+                query: function(sqlStr) {
+                    return new Promise((resQ, rejQ) => {
+                        let req = new sql.Request(sqlStr, (err, rowCount, rows) => {
+                            if (err) return rejQ(err);
+                            let recordset = rows.map(row => {
+                                let obj = {};
+                                row.forEach(col => { obj[col.metadata.colName] = col.value; });
+                                return obj;
+                            });
+                            resQ({ recordset });
+                        });
+                        if (this.params) { 
+                            this.params.forEach(p => req.addParameter(p.name, sql.TYPES.NVarChar, p.val)); 
+                        }
+                        connection.execSql(req);
+                    });
+                }
+            });
+            resolve({ request: requestAdapter });
+        }
+    });
+    connection.connect();
+});
 
 // --- 3. Chốt chặn bảo mật (Bản Master "Phá Đảo" cho ní Nhật) ---
 app.use((req, res, next) => {

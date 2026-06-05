@@ -379,9 +379,14 @@ app.post('/api/maintenance/update-status', async (req, res) => {
 });
 
 app.get('/api/admin/invite-codes', async (req, res) => {
-    const pool = await poolPromise;
-    const result = await pool.request().query("SELECT ic.Code as code, r.RoleName as role FROM InviteCodes ic JOIN Roles r ON ic.RoleID = r.RoleID");
-    res.json(result.recordset);
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT ic.Code as code, r.RoleName as role FROM InviteCodes ic JOIN Roles r ON ic.RoleID = r.RoleID");
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("❌ LỖI LẤY MÃ MỜI:", err.message);
+        res.json([]);
+    }
 });
 
 app.delete('/api/admin/delete-user/:id', async (req, res) => {

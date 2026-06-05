@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise SCADA | Management System</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root { --primary-tech: #1a56db; --bg-body: #f8fafc; --sidebar-bg: #ffffff; --text-main: #1e293b; --border-ui: #e2e8f0; }
+    body { background-color: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    
+    #system-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: #0f172a; z-index: 10000; display: flex; align-items: center; justify-content: center;
+        color: #3b82f6; flex-direction: column; transition: opacity 0.5s ease;
+    }
+    
+    .sidebar { width: 260px; height: 100vh; position: fixed; background: var(--sidebar-bg); border-right: 1px solid var(--border-ui); padding: 1.5rem; z-index: 1000; }
+    .nav-link { color: #64748b; padding: 12px; border-radius: 8px; margin-bottom: 5px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; text-decoration: none; }
+    .nav-link:hover, .nav-link.active { background: var(--primary-tech); color: white !important; }
+    .main-content { margin-left: 260px; padding: 2.5rem; }
+    .view-section { display: none; }
+    .view-section.active { display: block; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .tech-card { background: white; border: 1px solid var(--border-ui); border-radius: 12px; padding: 1.25rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+    .stat-card { border-top: 4px solid var(--primary-tech); }
+    .metric-value { font-family: 'JetBrains Mono', monospace; font-size: 1.8rem; font-weight: 800; color: #1e293b; }
+    
+    .chart-wrapper { 
+        position: relative; 
+        height: 550px; 
+        width: 100%; 
+    }
+/* CSS cho Sidebar thu gọn */
+.sidebar { transition: all 0.3s ease; }
+.main-content { transition: all 0.3s ease; }
+body.collapsed .sidebar { left: -260px; }
+body.collapsed .main-content { margin-left: 0; padding-left: 4.5rem; }
+
+#sidebar-toggle {
+    position: fixed;
+    left: 245px;
+    top: 20px;
+    z-index: 2000;
+    width: 30px;
+    height: 30px;
+    background: var(--primary-tech);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+body.collapsed #sidebar-toggle { left: 15px; }
+
+    .table-lhu { border: 1px solid #dee2e6; width: 100%; table-layout: fixed; }
+    .table-lhu thead th { background: #1a56db; color: white; text-align: center; font-size: 0.75rem; padding: 10px; border: 1px solid #0d47a1; }
+    .table-lhu td { border: 1px solid #dee2e6; height: 130px; vertical-align: top; padding: 6px; background: #fff; }
+    .table-lhu .slot-label { background: #f1f5f9; width: 50px; text-align: center; vertical-align: middle; font-weight: 900; color: #475569; font-size: 0.8rem; }
+    .week-container { margin-bottom: 2.5rem; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .week-header { background: #f8fafc; padding: 10px 15px; border-bottom: 2px solid #1a56db; display: flex; justify-content: space-between; align-items: center; }
+    .shift-item { background: #eff6ff; border-left: 3px solid #1a56db; padding: 4px 6px; border-radius: 4px; margin-bottom: 4px; font-size: 0.65rem; color: #1e40af; font-weight: 600; }
+    .admin-plus-btn { width: 100%; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 0.55rem; padding: 2px; border-radius: 4px; cursor: pointer; }
+    .sensor-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #3b82f6; }
+
+    .lib-card { border: 1px solid #e2e8f0; transition: 0.3s; cursor: pointer; text-decoration: none !important; color: inherit; }
+    .lib-card:hover { transform: translateY(-5px); border-color: var(--primary-tech); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    .lib-logo { height: 35px; object-fit: contain; margin-bottom: 8px; }
+    #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+    .scada-toast { 
+        background: #fff; border-left: 5px solid #ef4444; padding: 15px; border-radius: 8px; 
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); min-width: 300px; display: flex; align-items: center; gap: 15px;
+        animation: slideInRight 0.5s ease-out;
+    }
+    .status-badge { font-size: 0.7rem; padding: 4px 8px; border-radius: 4px; font-weight: 800; text-transform: uppercase; }
+    .bg-running { background: #dcfce7; color: #166534; }
+    .bg-error { background: #fee2e2; color: #991b1b; animation: pulse 1s infinite; }
+    .bg-fixing { background: #fef3c7; color: #92400e; }
+    .fan-spin { animation: fa-spin 1s infinite linear; display: inline-block; color: #3b82f6; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fa-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    /* Vá font chuẩn cho lịch trực và thêm style nút xóa */
+/* Vá font chuẩn cho lịch trực và định dạng lại thẻ nhân sự */
+.table-lhu, .shift-item, .slot-label { 
+    font-family: 'Inter', -apple-system, sans-serif !important; 
+}
+
+.shift-item { 
+    display: flex; 
+    flex-direction: column; /* BÍ QUYẾT Ở ĐÂY: Ép xếp dọc từ trên xuống */
+    justify-content: flex-start;
+    align-items: stretch; 
+    margin-bottom: 8px;
+    background: #ffffff;
+    border-left: 4px solid var(--primary-tech);
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.task-label {
+    font-size: 0.65rem;
+    color: var(--primary-tech);
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-top: 6px;
+    border-top: 1px dashed #e2e8f0;
+    padding-top: 6px;
+    display: block; /* Đảm bảo nó chiếm nguyên một dòng */
+}
+
+.task-desc {
+    font-size: 0.75rem;
+    color: #475569;
+    font-style: italic;
+    line-height: 1.4;
+    word-wrap: break-word; /* Nếu nhiệm vụ dài quá nó tự xuống hàng */
+}
+
+.btn-delete-shift { 
+    color: #ef4444; 
+    cursor: pointer; 
+    font-size: 0.8rem; 
+    opacity: 0.5; 
+    transition: 0.2s;
+}
+.btn-delete-shift:hover { opacity: 1; transform: scale(1.1); }
+
+/* --- HỆ THỐNG THÔNG BÁO --- */
+/* Container tổng (trong suốt, chỉ chứa icon và form) */
+#admin-chat-bubble {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 9999;
+}
+
+/* Biến tay cầm thành hình tròn xanh */
+#bubble-handle {
+    width: 60px;
+    height: 60px;
+    background: var(--primary-tech);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    cursor: move; /* Vẫn giữ tính năng kéo thả của Nhật */
+    border: 3px solid white;
+    transition: transform 0.2s;
+}
+
+#bubble-handle:hover {
+    transform: scale(1.1);
+}
+
+/* Bảng soạn tin nhắn hiện ở phía trên icon */
+#notif-form {
+    position: absolute;
+    bottom: 75px;
+    right: 0;
+    width: 300px;
+    background: white;
+    border-radius: 15px;
+    border: 2px solid var(--primary-tech);
+    overflow: hidden;
+}
+
+/* --- HIỆU ỨNG THÔNG BÁO --- */
+/* Chớp đỏ cho Badge */
+.notif-flash { animation: flash-red 0.8s infinite; }
+@keyframes flash-red {
+    0%, 100% { background-color: #ef4444; transform: scale(1); }
+    50% { background-color: #f87171; transform: scale(1.1); }
+}
+
+/* Chuông rung bần bật */
+.bell-ring { animation: ring 0.5s infinite; color: #ef4444 !important; }
+@keyframes ring {
+    0% { transform: rotate(0); }
+    10% { transform: rotate(15deg); }
+    20% { transform: rotate(-15deg); }
+    100% { transform: rotate(0); }
+}
+
+/* Thẻ thông báo trong danh sách */
+.notif-card { border-left: 5px solid var(--primary-tech); transition: 0.3s; }
+.notif-card:hover { background-color: #f1f5f9; transform: translateX(5px); }
+
+body.collapsed .main-content { 
+    margin-left: 0; 
+    padding-left: 5rem; /* Tăng lên 5rem để thoáng hơn */
+    transition: all 0.3s ease; 
+}
+
+</style>
+</head>
+<body>
+<div id="sidebar-toggle" onclick="toggleSidebar()">
+    <i id="toggle-icon" class="fas fa-chevron-left"></i>
+</div>
+<div id="system-overlay">
+    <div class="text-center animate__animated animate__pulse animate__infinite">
+        <i class="fas fa-microchip fa-4x mb-4"></i>
+        <h3 id="overlay-text" class="fw-bold text-white uppercase tracking-widest">ĐANG KHỞI CHẠY HỆ THỐNG IOT...</h3>
+        <div class="spinner-border text-primary mt-3" role="status"></div>
+    </div>
+</div>
+
+<div class="sidebar d-flex flex-column shadow-sm">
+    <div class="fw-bold text-primary mb-4 pb-3 border-bottom h5"><i class="fas fa-microchip me-2"></i>SCADA CORE V2.0</div>
+    <div class="user-mini-card bg-light p-3 rounded mb-4 shadow-sm text-center">
+    <div class="big fw-bold text-truncate d-block"><%= user.fullname %></div>
+    <div class="badge bg-primary-subtle text-primary border border-primary-subtle w-100 mt-1" style="font-size: 0.8rem;"><%= user.role %>
+    </div>
+</div>
+    
+  <nav class="nav flex-column flex-grow-1">
+    <a class="nav-link active" onclick="switchView('monitor-view', this)">
+        <i class="fas fa-chart-line me-3"></i> Giám sát tổng thể
+    </a>
+    
+    <% if (user.rank != 1) { %> 
+        <a class="nav-link d-flex align-items-center" id="nav-notif" onclick="switchView('notification-view', this); stopNotifAnimation();">
+            <i class="fas fa-bell me-3" id="bell-icon"></i> Thông báo 
+            <span id="notif-badge" class="badge bg-danger ms-auto d-none">0</span>
+        </a>
+    <% } %>
+
+    <% if ([1, 2, 5].includes(user.rank)) { %> 
+        <a class="nav-link d-flex align-items-center" onclick="switchView('maintenance-view', this); loadSystemStatus();">
+            <i class="fas fa-tools me-3"></i> Bảo trì 
+            <span id="error-badge" class="badge bg-danger ms-auto d-none">0</span>
+        </a>
+    <% } %>
+
+    <% if (user.rank <= 4) { %> 
+        <a class="nav-link" onclick="switchView('history-view', this); loadLogs();">
+            <i class="fas fa-history me-3"></i> Nhật ký vận hành
+        </a>
+    <% } %>
+
+    <% if (user.rank <= 3) { %> 
+        <a class="nav-link" onclick="switchView('schedule-view', this); renderAllSchedules();">
+            <i class="fas fa-calendar-alt me-3"></i> Lịch trực hệ thống
+        </a>
+    <% } %>
+
+    <a class="nav-link" onclick="switchView('library-view', this)">
+        <i class="fas fa-project-diagram me-3"></i> Thư viện Kỹ thuật
+    </a>
+
+    <% if (user.rank == 1) { %>
+        <a class="nav-link text-primary fw-bold" onclick="switchView('admin-view', this); loadUsers(); loadInviteCodes();">
+            <i class="fas fa-user-shield me-3"></i> Quản trị Admin
+        </a>
+    <% } %>
+</nav>
+
+    <a href="javascript:void(0)" onclick="triggerLogout()" class="nav-link text-danger border-top pt-3 mt-auto"><i class="fas fa-sign-out-alt me-2"></i> KẾT THÚC CA</a>
+</div>
+
+<div class="main-content">
+    <div id="monitor-view" class="view-section active">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <div><h4 class="fw-bold mb-0">FACTORY ANALYTICS</h4><span class="text-muted small"><i class="fas fa-clock me-1"></i> <span id="clock">--:--:--</span></span></div>
+            <!-- ĐÃ THAY BẰNG TRẠNG THÁI IOT LIVE -->
+            <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 animate__animated animate__fadeIn">
+                <i class="fas fa-broadcast-tower me-2"></i>LIVE IOT DATA ONLINE
+            </div>
+        </header>
+        <div class="row g-3 mb-4">
+            <div class="col-md-3"><div class="tech-card stat-card"><div class="small text-muted fw-bold text-uppercase">OEE Efficiency</div><div class="metric-value text-primary" id="stat-oee">0.0%</div></div></div>
+            <div class="col-md-3"><div class="tech-card stat-card" style="border-color: #10b981;"><div class="small text-muted fw-bold text-uppercase">Thiết bị khả dụng</div><div class="metric-value text-success" id="stat-active">0</div></div></div>
+            <div class="col-md-6">
+    <div class="tech-card shadow-lg border-0 p-3">
+        <div class="small fw-bold text-muted text-uppercase mb-2">Thông số môi trường</div>
+        <div class="d-flex justify-content-between text-center">
+            <div>
+                <div class="text-muted small">Nhiệt độ</div>
+                <div class="fw-bold h5 m-0" id="env-temp" style="color: #00d1ff;">24.2°C</div>
+            </div>
+            <div>
+                <div class="text-muted small">Độ ẩm</div>
+                <div class="fw-bold h5 m-0" id="env-humid" style="color: #00ff88;">45%</div>
+            </div>
+            <div>
+                <div class="text-muted small">Khí nén</div>
+                <div class="fw-bold h5 m-0" id="env-pressure" style="color: #ffcc00;">6.5 Bar</div>
+            </div>
+            <div class="text-success small fw-bold" id="env-status">
+                <i class="fas fa-shield-check"></i> AN TOÀN
+            </div>
+        </div>
+    </div>
+</div>
+        </div>
+        <div class="row g-4">
+            <div class="col-lg-8"><div class="tech-card"><h6 class="fw-bold text-uppercase small mb-4">Stream Telemetry</h6><div class="chart-wrapper"><canvas id="productionChart"></canvas></div></div></div>
+            <div class="col-lg-4"><div class="tech-card h-100 shadow-sm"><h6 class="fw-bold mb-3 small text-uppercase">Danh sách máy móc</h6><div id="machine-status-list" style="max-height: 400px; overflow-y: auto;"></div></div></div>
+        </div>
+    </div>
+
+    <div id="library-view" class="view-section">
+    <div class="mb-4">
+        <h4 class="fw-bold m-0 text-uppercase">Tài nguyên Cơ điện tử & Automation</h4>
+        <p class="text-muted small">Hệ thống liên kết trực tiếp tới các nền tảng kỹ thuật tiêu chuẩn quốc tế.</p>
+    </div>
+
+    <div class="row g-4">
+        <a href="https://vn.misumi-ec.com/" target="_blank" class="col-md-4">
+            <div class="tech-card lib-card h-100 p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <img src="https://vn.misumi-ec.com/favicon.ico" class="lib-logo me-2" alt="Misumi">
+                    <h5 class="fw-bold m-0">MISUMI VN</h5>
+                </div>
+                <p class="small text-secondary mb-3" style="text-align: justify;">
+                    <b>Giới thiệu:</b> "Siêu thị" linh kiện công nghiệp hàng đầu thế giới. Đây là nơi có thể tự cấu hình thông số cho các bộ phận như trục, bạc đạn, thanh dẫn hướng... và tải file CAD chính xác 100% để đưa vào SOLIDWORKS.
+                </p>
+                <div class="text-primary fw-bold small"><i class="fas fa-external-link-alt me-1"></i> TRUY CẬP MISUMI</div>
+            </div>
+        </a>
+
+        <a href="https://www.smcworld.com/en-jp/" target="_blank" class="col-md-4">
+            <div class="tech-card lib-card h-100 p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-wind fa-2x text-primary me-2"></i>
+                    <h5 class="fw-bold m-0">SMC PNEUMATICS</h5>
+                </div>
+                <p class="small text-secondary mb-3" style="text-align: justify;">
+                    <b>Giới thiệu:</b> Thủ phủ của ngành khí nén toàn cầu. SMC cung cấp thư viện đồ sộ về xi lanh, van điện từ, và bộ lọc khí. Đặc biệt hữu ích khi cần tra cứu lực đẩy xi lanh hoặc sơ đồ mạch khí nén cho các trạm SCADA.
+                </p>
+                <div class="text-primary fw-bold small"><i class="fas fa-external-link-alt me-1"></i> TRUY CẬP SMC WORLD</div>
+            </div>
+        </a>
+
+        <a href="https://grabcad.com/library" target="_blank" class="col-md-4">
+            <div class="tech-card lib-card h-100 p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-cube fa-2x text-warning me-2"></i>
+                    <h5 class="fw-bold m-0">GRABCAD COMMUNITY</h5>
+                </div>
+                <p class="small text-secondary mb-3" style="text-align: justify;">
+                    <b>Giới thiệu:</b> Cộng đồng kỹ sư lớn nhất hành tinh. Nơi chia sẻ hàng triệu Model 3D miễn phí từ cánh tay robot Fanuc đến cả dây chuyền sản xuất. Là "kho báu" để tìm ý tưởng thiết kế cơ khí cực nhanh.
+                </p>
+                <div class="text-primary fw-bold small"><i class="fas fa-external-link-alt me-1"></i> TRUY CẬP GRABCAD</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="tech-card mt-4 bg-primary-subtle border-primary-subtle">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle text-primary fa-lg me-3"></i>
+            <span class="small fw-bold text-primary">LƯU Ý: Các tài nguyên trên dùng để tra cứu mã linh kiện thực tế (Part Number) và chuẩn hóa thiết kế CAD cho hệ thống SCADA.</span>
+        </div>
+    </div>
+</div>
+
+    <div id="schedule-view" class="view-section">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold m-0 text-uppercase">HỆ THỐNG ĐIỀU PHỐI NHÂN SỰ</h4>
+            <% if (user.rank == 1) { %>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addWeekModal"><i class="fas fa-calendar-plus me-2"></i>THÊM TUẦN</button>
+                <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="openDeleteWeekModal()"><i class="fas fa-trash-alt me-2"></i>XÓA TUẦN</button>
+            </div>
+            <% } %>
+        </div>
+        <div id="schedule-container"></div>
+    </div>
+
+  <div id="maintenance-view" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold m-0 text-uppercase">ĐIỀU HÀNH BẢO TRÌ THÔNG MINH</h4>
+        <% if (user.rank == 1) { %>
+            <button class="btn btn-primary btn-sm fw-bold shadow-sm" onclick="openAddMachineModal()">
+                <i class="fas fa-plus me-2"></i>THÊM MÁY
+            </button>
+        <% } %>
+    </div>
+    <div class="tech-card shadow-sm p-0 overflow-hidden">
+        <table class="table align-middle text-center mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-start ps-4">Thiết bị</th>
+                    <th>Trạng thái</th>
+                    <th>Nhiệt độ</th>
+                    <th>Độ ồn</th>
+                    <% if (user.rank == 1) { %><th style="width: 80px;">Hệ thống</th><% } %>
+                </tr>
+            </thead>
+            <tbody id="maintenance-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+    <div id="history-view" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold m-0 text-uppercase">NHẬT KÝ VẬN HÀNH</h4>
+        
+        <% if (user.rank <= 3) { %>
+        <a href="/api/admin/export-logs" class="btn btn-success btn-sm fw-bold shadow-sm">
+            <i class="fas fa-file-excel me-2"></i> XUẤT BÁO CÁO CSV
+        </a>
+        <% } %>
+    </div>
+    
+    <div class="tech-card p-0 overflow-hidden">
+        <table class="table table-hover table-sm mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th class="ps-3">Thiết bị</th>
+                    <th>Nội dung sự cố</th>
+                    <th>Thời gian</th>
+                    <th class="text-center">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="logs-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+    <div id="admin-view" class="view-section">
+        <div class="mb-4">
+    <h4 class="fw-bold m-0 text-uppercase text-primary"><i class="fas fa-user-lock me-2"></i>QUẢN TRỊ HỆ THỐNG</h4>
+    <p class="text-muted small">Quản lý nhân sự LH_AUTX và cấu hình quyền truy cập trạm SCADA.</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="tech-card h-100">
+            <h6 class="fw-bold mb-3 small text-uppercase"><i class="fas fa-users me-2"></i>DANH SÁCH NHÂN SỰ</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr class="small text-muted">
+                            <th>HỌ TÊN</th>
+                            <th>USERNAME</th>
+                            <th>ROLE / CẤP ĐỘ</th>
+                            <th class="text-center">THAO TÁC</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table-body">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="tech-card h-100">
+            <h6 class="fw-bold mb-3 small text-uppercase"><i class="fas fa-key me-2"></i>MÃ MỜI ĐĂNG KÝ</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead class="table-light">
+                        <tr class="small text-muted">
+                            <th>MÃ CODE</th>
+                            <th>QUYỀN HẠN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invite-table-body">
+                        </tbody>
+                </table>
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="generateInviteCode()"><i class="fas fa-plus-circle me-2"></i>TẠO MÃ MỚI</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addWeekModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white"><h6 class="modal-title fw-bold">CHỌN TUẦN MỚI</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-3">
+                <div class="mb-2"><label class="small fw-bold">TỪ NGÀY</label><input type="date" id="week-start-date" class="form-control border-primary"></div>
+                <div class="mb-3"><label class="small fw-bold">ĐẾN NGÀY</label><input type="date" id="week-end-date" class="form-control border-primary"></div>
+                <div class="p-2 bg-light rounded text-center mb-3">
+                    <span class="small text-muted">Preview:</span><br><code id="preview-week-text" class="fw-bold text-primary">chưa chọn...</code>
+                </div>
+                <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="submitNewWeek()">XÁC NHẬN KHỞI TẠO</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL THÊM THIẾT BỊ MỚI -->
+<div class="modal fade" id="addMachineModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <h6 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i>THIẾT LẬP THIẾT BỊ MỚI</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">TÊN THIẾT BỊ / TRẠM SCADA</label>
+                    <input type="text" id="new-machine-name" class="form-control border-primary" placeholder="VD: CNC Milling V3">
+                </div>
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">MÔ TẢ KỸ THUẬT</label>
+                    <textarea id="new-machine-desc" class="form-control" rows="3" placeholder="VD: Máy phay kỹ thuật số trục đứng..."></textarea>
+                </div>
+                <button class="btn btn-primary w-100 fw-bold py-2" onclick="submitNewMachine()">XÁC NHẬN KHỞI TẠO</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteWeekModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content shadow-lg border-0"><div class="modal-header bg-danger text-white"><h6 class="modal-title fw-bold">XÓA TUẦN TRỰC</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><select id="delete-week-select" class="form-select mb-3"></select><button class="btn btn-danger btn-sm w-100 fw-bold" onclick="submitDeleteWeek()">XÁC NHẬN XÓA</button></div></div></div></div>
+<div class="modal fade" id="assignModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content shadow-lg border-0"><div class="modal-header bg-primary text-white"><h6 class="modal-title fw-bold">PHÂN NHÂN SỰ</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-3"><input type="hidden" id="assign-week-day"><input type="hidden" id="assign-slot"><div class="mb-3"><label class="small fw-bold">NHÂN VIÊN</label><select id="person-select" class="form-select form-select-sm"></select></div><div class="mb-3"><label class="small fw-bold">NHIỆM VỤ</label><input type="text" id="task-input" class="form-control form-control-sm" placeholder="VD: Sửa máy CNC"></div><button class="btn btn-primary btn-sm w-100 fw-bold" onclick="submitAssignment()">XÁC NHẬN GÁN</button></div></div></div></div>
+<div class="modal fade" id="logoutModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg" style="border-radius: 20px;"><div class="modal-body text-center p-5"><div class="text-warning mb-4"><i class="fas fa-sign-out-alt fa-4x"></i></div><h4 class="fw-bold">KẾT THÚC CA TRỰC?</h4><div class="d-flex gap-3 mt-4"><button class="btn btn-light flex-fill py-3 fw-bold" data-bs-dismiss="modal">HỦY BỎ</button><button class="btn btn-danger flex-fill py-3 fw-bold shadow" onclick="executeLogout()">XÁC NHẬN OUT</button></div></div></div></div></div>
+
+<div id="toast-container"></div>
+
+<div id="notification-view" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold m-0 text-uppercase">HỘP THƯ HỆ THỐNG</h4>
+        <button class="btn btn-outline-secondary btn-sm fw-bold" onclick="clearNotifications()">XÓA TẤT CẢ</button>
+    </div>
+    <div id="user-notif-list" class="row g-3">
+        <div class="col-12 text-center py-5 text-muted empty-state">
+            <i class="fas fa-comment-slash fa-3x mb-3 opacity-25"></i>
+            <p>Hiện tại chưa có thông báo nào dành cho bạn.</p>
+        </div>
+    </div>
+</div>
+<div id="toast-container"></div>
+
+<% if (user.rank == 1) { %>
+    <div id="admin-chat-bubble">
+        <div id="bubble-handle" class="shadow-lg">
+            <i class="fas fa-comment-dots"></i>
+        </div>
+    <div id="notif-form" class="p-3 shadow-lg d-none">
+    <div class="form-header mb-3 border-bottom pb-2 d-flex align-items-center">
+        <i class="fas fa-paper-plane text-primary me-2"></i>
+        <h6 class="fw-bold m-0 text-primary uppercase small">PHÁT TIN HỆ THỐNG</h6>
+    </div>
+    <div class="mb-3">
+        <label class="small fw-bold text-muted mb-1">ĐỐI TƯỢNG NHẬN TIN</label>
+        <div class="d-flex gap-2 mb-2">
+            <div class="form-check small">
+                <input class="form-check-input" type="radio" name="targetType" id="targetRole" value="role" checked onclick="toggleTargetView()">
+                <label class="form-check-label fw-bold" for="targetRole">Theo nhóm</label>
+            </div>
+            <div class="form-check small">
+                <input class="form-check-input" type="radio" name="targetType" id="targetUser" value="user" onclick="toggleTargetView()">
+                <label class="form-check-label fw-bold" for="targetUser">Cá nhân</label>
+            </div>
+        </div>
+        <div id="div-role-select">
+            <select id="send-role" class="form-select form-select-sm border-primary shadow-sm">
+                <option value="all">-- TẤT CẢ THÀNH VIÊN --</option>
+                <option value="2">FACTORY SUPERVISOR (RANK 2)</option>
+                <option value="3">MAINTENANCE ENGINEER (RANK 3)</option>
+                <option value="4">QUALITY CONTROLLER (RANK 4)</option>
+                <option value="5">MACHINE OPERATOR (RANK 5)</option>
+                <option value="6">TECHNICAL INTERN (RANK 6)</option>
+            </select>
+        </div>
+        <div id="div-user-select" class="d-none">
+            <select id="send-username" class="form-select form-select-sm border-primary shadow-sm">
+                <option value="">-- Chọn nhân sự đích danh --</option>
+            </select>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label class="small fw-bold text-muted mb-1">NỘI DUNG</label>
+        <textarea id="send-msg" class="form-control form-control-sm border-primary" rows="3" placeholder="Nhập nội dung..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="broadcastNotif()">XÁC NHẬN PHÁT TIN</button>
+</div>
+      
+<% } %>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let isKicked = false;
+    let logoutModal;
+    let lastSeenErrors = []; 
+    const CURRENT_USER_RANK = parseInt("<%= user.rank %>");
+    const CURRENT_USER_ID = "<%= user.id %>";
+    const errorTimers = {}; // Khai báo biến global cho thời gian lỗi
+
+    window.addEventListener('load', () => {
+        document.querySelectorAll('.modal').forEach(m => document.body.appendChild(m));
+        logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+        setTimeout(() => {
+            const overlay = document.getElementById('system-overlay');
+            if(overlay) { 
+                overlay.style.opacity = '0'; 
+                setTimeout(() => overlay.style.display = 'none', 500); 
+            }
+        }, 1200);
+
+        const updatePreview = () => {
+            const s = document.getElementById('week-start-date').value;
+            const e = document.getElementById('week-end-date').value;
+            if(s && e) document.getElementById('preview-week-text').innerText = `${formatToLHU(s)} - ${formatToLHU(e)}`;
+        };
+        document.getElementById('week-start-date')?.addEventListener('change', updatePreview);
+        document.getElementById('week-end-date')?.addEventListener('change', updatePreview);
+    });
+
+    function formatToLHU(dateStr) {
+        const d = new Date(dateStr);
+        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+
+    function toggleTargetView() {
+    const isRole = document.getElementById('targetRole').checked;
+    const roleDiv = document.getElementById('div-role-select');
+    const userDiv = document.getElementById('div-user-select');
+
+    if (isRole) {
+        roleDiv.classList.remove('d-none');
+        userDiv.classList.add('d-none');
+        document.getElementById('send-username').value = ""; // Reset cá nhân khi chọn nhóm
+    } else {
+        roleDiv.classList.add('d-none');
+        userDiv.classList.remove('d-none');
+        document.getElementById('send-role').value = "all"; // Reset về 'all' khi chọn cá nhân
+    }
+}
+
+    async function apiFetch(url, options = {}) {
+        if (isKicked) return; 
+        try {
+            const res = await fetch(url, options);
+            if (res.status === 403) { isKicked = true; location.reload(); return; }
+            return res.json();
+        } catch (e) { return null; }
+    }
+
+    function triggerLogout() { logoutModal.show(); }
+    function executeLogout() {
+        logoutModal.hide();
+        const overlay = document.getElementById('system-overlay');
+        overlay.style.display = 'flex'; overlay.style.opacity = '1';
+        document.getElementById('overlay-text').innerText = "ĐANG ĐĂNG XUẤT & LƯU DATA...";
+        setTimeout(() => window.location.href = '/logout', 1000);
+    }
+
+    function switchView(viewId, element) {
+        document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        element.classList.add('active');
+        if(viewId === 'history-view') loadLogs();
+        if(viewId === 'admin-view') { loadUsers(); loadInviteCodes(); }
+        if(viewId === 'maintenance-view') loadSystemStatus(); 
+        if(viewId === 'schedule-view') renderAllSchedules();
+    }
+
+    async function renderAllSchedules() {
+        const container = document.getElementById('schedule-container');
+        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+        try {
+            const weeksList = await apiFetch('/api/system/weeks') || [];
+            const allData = await apiFetch('/api/system/all-schedules') || [];
+            const days = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ Nhật'];
+            let html = '';
+            weeksList.forEach(wk => {
+                html += `<div class="week-container animate__animated animate__fadeIn">
+                    <div class="week-header"><h6 class="fw-bold m-0 text-primary"><i class="fas fa-calendar-week me-2"></i>Tuần: ${wk}</h6></div>
+                    <table class="table-lhu">
+                        <thead><tr><th style="width:60px">Buổi</th>${days.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+                        <tbody>
+                            <tr><td class="slot-label">SÁNG</td>${days.map(d => `<td>${renderSlot(allData, wk, d, 'Sáng')}</td>`).join('')}</tr>
+                            <tr><td class="slot-label">CHIỀU</td>${days.map(d => `<td>${renderSlot(allData, wk, d, 'Chiều')}</td>`).join('')}</tr>
+                        </tbody>
+                    </table>
+                </div>`;
+            });
+            container.innerHTML = html;
+        } catch(e) { container.innerHTML = '<div class="alert alert-warning">Lỗi tải dữ liệu lịch trực!</div>'; }
+    }
+
+    // ✅ BẢN CHUẨN: HIỂN THỊ CHO TẤT CẢ MỌI NGƯỜI & HIỆN NHIỆM VỤ
+function renderSlot(data, wk, day, slot) {
+    // Lấy tất cả nhân sự trong ca trực đó
+    const shifts = data.filter(s => s.week === wk && s.day === day && s.slot === slot);
+    
+    // Định nghĩa quyền Admin (Chỉ Rank 1 mới được Thêm/Xóa)
+    const isAdmin = (CURRENT_USER_RANK === 1); 
+
+    // Render danh sách (Ai cũng thấy được)
+    let h = shifts.map(s => `
+        <div class="shift-item animate__animated animate__fadeIn">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold" style="font-size: 0.85rem; color: #1e293b;">
+                    <i class="fas fa-user-circle me-1 text-primary"></i> ${s.userName}
+                </span>
+                ${isAdmin ? `<i class="fas fa-times-circle btn-delete-shift" title="Xóa nhân sự" onclick="deleteShift('${s.userId}','${wk}','${day}','${slot}')"></i>` : ''}
+            </div>
+            
+            <span class="task-label">Nhiệm vụ:</span>
+            <div class="task-desc">
+                ${s.task ? s.task : 'Chưa có nhiệm vụ'}
+            </div>
+        </div>`).join('');
+
+    // Chỉ Admin mới thấy nút Gán Việc
+    if(isAdmin) {
+        h += `<button class="admin-plus-btn mt-2" onclick="openAssignModal('${wk}|${day}','${slot}')"><i class="fas fa-plus"></i> Gán nhân sự</button>`;
+    }
+    return h;
+}
+
+    async function submitNewWeek() {
+        const s = document.getElementById('week-start-date').value;
+        const e = document.getElementById('week-end-date').value;
+        if(!s || !e) return alert("Chưa chọn ngày bắt đầu và kết thúc!");
+        const weekStr = `${formatToLHU(s)} - ${formatToLHU(e)}`;
+        const res = await apiFetch('/api/admin/add-week', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ week_range: weekStr }) });
+        if(res && res.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('addWeekModal')).hide();
+            renderAllSchedules();
+        }
+    }
+
+    async function openDeleteWeekModal() {
+        const weeks = await apiFetch('/api/system/weeks');
+        if(weeks) {
+            document.getElementById('delete-week-select').innerHTML = weeks.map(wk => `<option value="${wk}">${wk}</option>`).join('');
+            new bootstrap.Modal(document.getElementById('deleteWeekModal')).show();
+        }
+    }
+
+    async function submitDeleteWeek() {
+        const wk = document.getElementById('delete-week-select').value;
+        if(!wk) return;
+        if(confirm(`XÓA SẠCH tuần ${wk}?`)) {
+            const res = await apiFetch(`/api/admin/delete-week?week_range=${encodeURIComponent(wk)}`, { method: 'DELETE' });
+            if(res && res.status === 'success') { 
+                bootstrap.Modal.getInstance(document.getElementById('deleteWeekModal')).hide(); 
+                renderAllSchedules(); 
+            }
+        }
+    }
+
+    async function openAssignModal(wkDay, slot) {
+    document.getElementById('assign-week-day').value = wkDay;
+    document.getElementById('assign-slot').value = slot;
+    const users = await apiFetch('/api/admin/users');
+    if(users) {
+        document.getElementById('person-select').innerHTML = users.map(u => `<option value="${u.id}">${u.fullname}</option>`).join('');
+        
+        // ✅ Sửa lại chỗ này: Dùng getOrCreateInstance để không bị chồng lớp nền
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal')).show();
+    }
+}
+
+    async function submitAssignment() {
+        const [wk, dy] = document.getElementById('assign-week-day').value.split('|');
+        const payload = { user_id: document.getElementById('person-select').value, week: wk, day: dy, slot: document.getElementById('assign-slot').value, task: document.getElementById('task-input').value };
+        const res = await apiFetch('/api/admin/assign-shift', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if(res && res.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
+            renderAllSchedules();
+        }
+    }
+
+    async function checkLiveAlerts() {
+        const machines = await apiFetch('/api/system-status');
+        if(!machines) return;
+        const currentErrors = machines.filter(m => m.status.includes('Error'));
+        currentErrors.forEach(m => {
+            if(!lastSeenErrors.includes(m.id)) {
+                showToast(`SỰ CỐ: ${m.name} báo lỗi!`);
+                if(CURRENT_USER_RANK <= 2) { new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play().catch(e=>{}); }
+            }
+        });
+        lastSeenErrors = currentErrors.map(m => m.id);
+    }
+
+    function showToast(msg) {
+        const id = 'toast-' + Date.now();
+        const html = `<div id="${id}" class="scada-toast shadow-lg"><i class="fas fa-exclamation-triangle text-danger fa-2x animate__animated animate__flash animate__infinite"></i><div><b class="text-danger">CẢNH BÁO</b><br><small>${msg}</small></div></div>`;
+        document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
+        setTimeout(() => document.getElementById(id)?.remove(), 5000);
+    }
+
+    async function loadLogs() {
+        const l = await apiFetch('/api/system-logs'); 
+        if(l) document.getElementById('logs-table-body').innerHTML = l.map(x => `<tr><td class="fw-bold small ps-3">${x.name}</td><td class="text-danger small">${x.reason}</td><td class="small text-muted">${x.time}</td><td class="text-center"><button class="btn btn-link text-danger p-0" onclick="deleteLog('${x.id}')"><i class="fas fa-trash-alt"></i></button></td></tr>`).join(''); 
+    }
+
+    async function deleteLog(id) { if(confirm('Xóa?')) { const res = await apiFetch(`/api/admin/delete-log/${id}`, { method: 'DELETE' }); if(res && res.status === 'success') loadLogs(); } }
+    async function loadInviteCodes() { const codes = await apiFetch('/api/admin/invite-codes'); if(codes) { document.getElementById('invite-table-body').innerHTML = codes.map(c => `<tr><td class="fw-bold text-primary" style="font-size:0.75rem">${c.code}</td><td><span class="badge bg-light text-dark border">${c.role}</span></td><td><span class="badge bg-success">Sẵn sàng</span></td></tr>`).join(''); } }
+    async function loadUsers() { 
+        const users = await apiFetch('/api/admin/users'); 
+        if(users) document.getElementById('user-table-body').innerHTML = users.map(u => `<tr><td>${u.fullname}</td><td>${u.username}</td><td><span class="badge bg-primary-subtle text-primary border">${u.role}</span></td><td><button class="btn btn-link text-danger btn-sm p-0" onclick="deleteUser('${u.id}')"><i class="fas fa-user-minus"></i></button></td></tr>`).join(''); 
+    }
+    async function deleteUser(id) { if(confirm('Xóa?')) { await apiFetch(`/api/admin/delete-user/${id}`, { method: 'DELETE' }); loadUsers(); } }
+    async function loadStats() { const stats = await apiFetch('/api/stats/overview'); if(stats) { document.getElementById('stat-oee').innerText = (stats.oee_rate || 0) + '%'; document.getElementById('stat-active').innerText = (stats.total_machines || 0) - (stats.active_alerts || 0); } }
+
+    async function loadSystemStatus() { 
+    // Lấy dữ liệu real-time từ Server
+    const machines = await apiFetch('/api/system-status') || []; 
+    const now = Date.now();
+
+    // ✅ 1. TÍNH TOÁN VÀ GÁN SỐ TRỰC TIẾP (KHÔNG ANIMATION)
+    const totalMachines = machines.length;
+    const errorCount = machines.filter(m => m.status.includes('Error')).length; 
+    const activeCount = totalMachines - errorCount;
+    
+    const statActiveEl = document.getElementById('stat-active');
+    if (statActiveEl) {
+        statActiveEl.innerText = activeCount; // Nhảy số dứt khoát, không giật giật
+    }
+
+    // ✅ 2. CẬP NHẬT DANH SÁCH NODES TRẠM
+    const nodeContainer = document.getElementById('machine-status-list');
+    if(nodeContainer) {
+        nodeContainer.innerHTML = machines.map(m => {
+            const isError = m.status.includes('Error');
+            const statusMap = { 'Error_Noise': 'LỖI ĐỘ ỒN', 'Error_Temp': 'LỖI NHIỆT ĐỘ', 'Running': 'ĐANG CHẠY' };
+            return `
+                <div class="d-flex justify-content-between border-bottom py-2 animate__animated animate__fadeIn">
+                    <span class="small fw-bold">${m.name}</span>
+                    <span class="status-badge ${isError ? 'bg-error' : 'bg-running'}">
+                        ${statusMap[m.status] || m.status}
+                    </span>
+                </div>`;
+        }).join('');
+    }
+
+    // ✅ 3. CẬP NHẬT BẢNG BẢO TRÌ
+    const maintenanceTable = document.getElementById('maintenance-table-body');
+    if(maintenanceTable) {
+        maintenanceTable.innerHTML = machines.map(m => {
+            let rowS = "", statusText = m.status;
+            let indicatorCooling = `<i class="fas fa-fan opacity-25"></i>`; 
+            let indicatorMaintenance = `<i class="fas fa-wrench opacity-25"></i>`;
+
+            if (m.status === 'Error_Temp') {
+                if (!errorTimers[m.id]) errorTimers[m.id] = now;
+                const elapsed = (now - errorTimers[m.id]) / 1000;
+                if (elapsed < 5) {
+                    rowS = "table-danger"; statusText = "LỖI NHIỆT ĐỘ"; 
+                    indicatorCooling = `<span class="text-danger fw-bold blink-anim"><i class="fas fa-thermometer-high"></i> QUÁ NHIỆT</span>`;
+                } else {
+                    rowS = "table-info"; statusText = "ĐANG HẠ NHIỆT"; 
+                    indicatorCooling = `<div class="text-info"><i class="fas fa-fan fan-spin"></i> HẠ NHIỆT...</div>`;
+                }
+            } else if (m.status === 'Error_Noise') {
+                rowS = "table-warning"; statusText = "LỖI ĐỘ ỒN";
+                indicatorMaintenance = `<span class="text-warning fw-bold blink-anim"><i class="fas fa-volume-up"></i> QUÁ ỒN</span>`;
+            } else if (m.status === 'Running') {
+                statusText = "ĐANG CHẠY";
+                indicatorCooling = `<i class="fas fa-check-circle text-success opacity-50"></i>`;
+                indicatorMaintenance = `<i class="fas fa-check-circle text-success opacity-50"></i>`;
+                if (errorTimers[m.id]) delete errorTimers[m.id]; 
+            }
+
+            return `
+                <tr class="${rowS} transition-all">
+                    <td class="fw-bold text-start ps-4">${m.name}</td>
+                    <td><span class="badge ${rowS ? 'bg-white text-dark border' : 'text-secondary'}">${statusText}</span></td>
+                    <td class="text-center">${indicatorCooling}</td>
+                    <td class="text-center">${indicatorMaintenance}</td>
+                    ${CURRENT_USER_RANK === 1 ? `<td><i class="fas fa-trash-alt text-danger cursor-pointer" title="Xóa Trạm" onclick="deleteMachine('${m.id}', '${m.name}')"></i></td>` : ''}
+                </tr>`;
+        }).join('');
+    }
+}
+
+    async function handleCooling(id) { await apiFetch('/api/maintenance/update-status', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({machine_id: id, next_step: 'Cooling'}) }); loadSystemStatus(); }
+    async function handleMaintenance(id, step) { await apiFetch('/api/maintenance/update-status', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({machine_id: id, next_step: step}) }); loadSystemStatus(); }
+    
+    const ctx = document.getElementById('productionChart').getContext('2d');
+    let productionChart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [{ label: 'Nhiệt độ', borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, data: [], tension: 0.4 }, { label: 'Độ ồn', borderColor: '#3b82f6', borderDash: [5,5], data: [], tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false } });
+    
+   async function updateDashboard() { 
+    const data = await apiFetch('/api/production-data');
+    if(data && data.labels.length > 0) { 
+        productionChart.data.labels = data.labels; 
+        productionChart.data.datasets[0].data = data.temp; 
+        productionChart.data.datasets[1].data = data.noise; 
+        productionChart.update('none');
+    } 
+    loadSystemStatus(); 
+    loadStats(); 
+    checkLiveAlerts();
+
+    // ✅ TỰ ĐỘNG TẢI TIN NHẮN CHO USER (Không cần F5)
+    if (CURRENT_USER_RANK > 1) {
+        const notifs = await apiFetch('/api/user/notifications');
+        if (notifs && notifs.length > 0) {
+            const list = document.getElementById('user-notif-list');
+            if (list) {
+                const empty = list.querySelector('.empty-state');
+                if (empty) empty.remove();
+                list.innerHTML = notifs.map(n => `
+                    <div class="col-12 animate__animated animate__fadeIn">
+                        <div class="tech-card notif-card p-3 shadow-sm bg-white border-start border-primary border-4">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small fw-bold text-primary"><i class="fas fa-user-shield me-1"></i> ${n.sender}</span>
+                                <small class="text-muted" style="font-size: 0.7rem;">${n.time}</small>
+                            </div>
+                            <p class="mb-0 small text-dark">${n.message}</p>
+                        </div>
+                    </div>`).join('');
+            }
+        }
+    }
+}
+    
+    updateDashboard(); setInterval(updateDashboard, 10000); setInterval(() => { if(!isKicked) document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }, 1000);
+
+    async function deleteShift(uid, wk, dy, sl) { if(confirm("Xóa?")) { await apiFetch(`/api/admin/delete-shift?user_id=${uid}&week=${encodeURIComponent(wk)}&day=${encodeURIComponent(dy)}&slot=${encodeURIComponent(sl)}`, { method: 'DELETE' }); renderAllSchedules(); } }
+    function openAddMachineModal() { new bootstrap.Modal(document.getElementById('addMachineModal')).show(); }
+    async function submitNewMachine() {
+        const name = document.getElementById('new-machine-name').value, desc = document.getElementById('new-machine-desc').value;
+        if(!name) return;
+        const res = await apiFetch('/api/admin/add-machine', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ machine_name: name, description: desc }) });
+        if(res && res.status === 'success') { bootstrap.Modal.getInstance(document.getElementById('addMachineModal')).hide(); loadSystemStatus(); }
+    }
+    
+    // ✅ ĐÃ FIX HÀM DELETE MACHINE Ở ĐÂY
+    async function deleteMachine(id, name) { 
+        if (confirm(`Xóa ${name}?`)) { 
+            const res = await apiFetch(`/api/admin/delete-machine/${id}`, { method: 'DELETE' });
+            if (res && res.status === 'success') loadSystemStatus(); 
+        } 
+    }
+
+    // Hàm tạo số ngẫu nhiên
+function generateRandom(min, max, decimals = 1) {
+    return (Math.random() * (max - min) + min).toFixed(decimals);
+}
+
+function updateFactoryVisuals() {
+    // 1. Nhảy số OEE (89% - 95%)
+    const oeeEl = document.getElementById('stat-oee');
+    if(oeeEl) oeeEl.innerText = generateRandom(89, 95, 1) + '%';
+
+    // 2. Nhảy số Nhiệt độ (23.5 - 25.5)
+    const tempEl = document.getElementById('env-temp');
+    if(tempEl) tempEl.innerText = generateRandom(23.5, 25.5, 1) + '°C';
+
+    // 3. Nhảy số Độ ẩm (43 - 48)
+    const humidEl = document.getElementById('env-humid');
+    if(humidEl) humidEl.innerText = generateRandom(43, 48, 0) + '%';
+
+    // 4. Nhảy số Áp suất (6.3 - 6.6)
+    const pressureEl = document.getElementById('env-pressure');
+    if(pressureEl) {
+        const val = generateRandom(6.3, 6.6, 2);
+        pressureEl.innerText = val + ' Bar';
+        
+        // Cảnh báo nếu áp suất thấp hơn 6.35
+        const statusEl = document.getElementById('env-status');
+        if(val < 6.35) {
+            statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ÁP SUẤT THẤP';
+            statusEl.className = "text-warning small fw-bold";
+        } else {
+            statusEl.innerHTML = '<i class="fas fa-shield-check"></i> AN TOÀN';
+            statusEl.className = "text-success small fw-bold";
+        }
+    }
+}
+
+// Hàm điều khiển Sidebar
+function toggleSidebar() {
+    document.body.classList.toggle('collapsed');
+    const icon = document.getElementById('toggle-icon');
+    if (document.body.classList.contains('collapsed')) {
+        icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
+    } else {
+        icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
+    }
+    // Resize biểu đồ nếu có
+    if(productionChart) setTimeout(() => productionChart.resize(), 350);
+}
+
+// Chạy cập nhật mỗi 2 giây
+setInterval(updateFactoryVisuals, 2000);
+
+
+// --- LOGIC HỆ THỐNG THÔNG BÁO (NHẬT COPY ĐOẠN NÀY) ---
+
+// 1. KHAI BÁO BIẾN (Chỉ khai báo 1 lần duy nhất)
+let unreadCount = 0;
+
+// 2. LOGIC CHO ADMIN (Di chuyển & Gửi tin)
+// ✅ LOGIC XỬ LÝ BONG BÓNG ADMIN (NHẤT DÁN VÀO ĐÂY)
+if (CURRENT_USER_RANK === 1) {
+    const bubble = document.getElementById('admin-chat-bubble');
+    const handle = document.getElementById('bubble-handle');
+    const form = document.getElementById('notif-form');
+
+    if (bubble && handle && form) {
+        let isDragging = false;
+        let hasMoved = false;
+
+        // Chặn sự kiện bên trong form để không bị tắt khi đang gõ
+        form.addEventListener('mousedown', (e) => e.stopPropagation());
+        form.addEventListener('mouseup', (e) => e.stopPropagation());
+
+        handle.onmousedown = (e) => {
+            isDragging = true;
+            hasMoved = false; 
+            let shiftX = e.clientX - bubble.getBoundingClientRect().left;
+            let shiftY = e.clientY - bubble.getBoundingClientRect().top;
+
+            document.onmousemove = (e) => {
+                if (!isDragging) return;
+                hasMoved = true;
+                bubble.style.left = (e.clientX - shiftX) + 'px';
+                bubble.style.top = (e.clientY - shiftY) + 'px';
+                bubble.style.bottom = 'auto'; bubble.style.right = 'auto';
+            };
+
+            document.onmouseup = () => {
+                isDragging = false;
+                document.onmousemove = null;
+                // 🚀 CỰC KỲ QUAN TRỌNG: Gỡ bỏ lệnh này ngay sau khi thả chuột
+                document.onmouseup = null; 
+
+                // Chỉ hiện bảng nếu là Click (không phải đang kéo đi)
+                if (!hasMoved) {
+                    form.classList.toggle('d-none');
+                }
+            };
+        };
+        handle.ondragstart = () => false;
+    }
+}
+
+// Hàm gửi tin nhắn
+async function broadcastNotif() {
+    const isRoleType = document.getElementById('targetRole').checked;
+    const role = document.getElementById('send-role').value;
+    const user = document.getElementById('send-username').value;
+    const msg = document.getElementById('send-msg').value;
+
+    if (!msg) return alert("Ní chưa nhập nội dung!");
+
+    // Nếu chọn gửi cá nhân mà chưa chọn ai thì báo lỗi
+    if (!isRoleType && !user) return alert("Vui lòng chọn nhân sự đích danh!");
+
+    const payload = {
+        type: isRoleType ? 'role' : 'user',
+        target: isRoleType ? role : user,
+        message: msg
+    };
+
+    // Gửi đi (Giữ nguyên logic apiFetch của ní)
+    const res = await apiFetch('/api/admin/send-notification', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    });
+
+    if (res && res.status === 'success') {
+        alert("Thông báo đã được phát đi!");
+        document.getElementById('send-msg').value = "";
+        document.getElementById('notif-form').classList.add('d-none');
+        receiveNotification({ message: msg }); // Giả lập nhận để ní test
+    }
+}
+
+// 3. LOGIC CHO NGƯỜI NHẬN (Rung chuông & Chớp đỏ)
+function receiveNotification(data) {
+    unreadCount++;
+    const badge = document.getElementById('notif-badge');
+    const bell = document.getElementById('bell-icon');
+    
+    if (badge) {
+        badge.innerText = unreadCount;
+        badge.classList.remove('d-none');
+        badge.classList.add('notif-flash');
+    }
+    if (bell) {
+        bell.classList.add('bell-ring');
+    }
+
+    const list = document.getElementById('user-notif-list');
+    if (list) {
+        const empty = list.querySelector('.empty-state');
+        if (empty) empty.remove();
+
+        const html = `
+            <div class="col-12 animate__animated animate__fadeInDown">
+                <div class="tech-card notif-card p-3 shadow-sm bg-white">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="small fw-bold text-primary"><i class="fas fa-user-shield me-1"></i> ADMIN LH_AUTX</span>
+                        <small class="text-muted" style="font-size: 0.7rem;">${new Date().toLocaleTimeString()}</small>
+                    </div>
+                    <p class="mb-0 small text-dark">${data.message}</p>
+                </div>
+            </div>`;
+        list.insertAdjacentHTML('afterbegin', html);
+    }
+}
+
+function stopNotifAnimation() {
+    unreadCount = 0;
+    const badge = document.getElementById('notif-badge');
+    const bell = document.getElementById('bell-icon');
+    if (badge) { 
+        badge.classList.add('d-none'); 
+        badge.classList.remove('notif-flash'); 
+    }
+    if (bell) {
+        bell.classList.remove('bell-ring');
+    }
+}
+</script>
+</body>
+</html>

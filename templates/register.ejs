@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hồ sơ Nhân sự mới | SCADA CORE</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root { --primary-tech: #1a56db; --bg-body: #f8fafc; --card-bg: #ffffff; --text-main: #1e293b; --border-ui: #e2e8f0; }
+        
+        /* Chỉnh font chuẩn Inter cho toàn bộ text, giữ font-family gốc cho Icon */
+        body, .form-title, .form-label, .form-control, .input-group-text { 
+            font-family: 'Inter', -apple-system, sans-serif !important; 
+        }
+
+        body { background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 0; }
+        .register-card { background: var(--card-bg); border: 1px solid var(--border-ui); border-radius: 12px; padding: 2.5rem; width: 100%; max-width: 580px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); animation: subtleFade 0.8s ease; }
+        @keyframes subtleFade { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .header-zone { text-align: center; margin-bottom: 2rem; border-bottom: 1px solid var(--border-ui); padding-bottom: 1.5rem; }
+        .brand-icon { width: 48px; height: 48px; background: #eff6ff; color: var(--primary-tech); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; border: 1px solid #dbeafe; }
+        .form-title { font-weight: 800; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.4rem; }
+        .input-group-text { background: #f8fafc; border: 1px solid var(--border-ui); color: #94a3b8; }
+        .form-control { border: 1px solid var(--border-ui); padding: 10px 12px; font-size: 0.9rem; transition: all 0.2s; }
+        .form-control:focus { border-color: var(--primary-tech); box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1); }
+        .invite-section { background: #f8fafc; padding: 1.25rem; border-radius: 8px; border: 1px dashed var(--primary-tech); margin: 1.5rem 0; }
+        .btn-primary { background: var(--primary-tech); border: none; padding: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 8px; }
+        .btn-primary:hover { background: #1e429f; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2); }
+        .alert { border-radius: 8px; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<div class="container d-flex justify-content-center">
+    <div class="register-card shadow-lg">
+        <div class="header-zone">
+            <div class="brand-icon"><i class="fas fa-user-shield fa-lg"></i></div>
+            <div class="form-title">Hồ sơ Nhân viên Mới</div>
+            <div class="text-muted small">SCADA CORE V2.0 - Lạc Hồng University</div>
+        </div>
+
+        <!-- HIỂN THỊ THÔNG BÁO LỖI -->
+        <% if (locals.messages && messages.length > 0) { %>
+            <div class="alert alert-danger d-flex align-items-center mb-4">
+                <i class="fas fa-exclamation-triangle me-2"></i> <%= messages[0] %>
+            </div>
+        <% } %>
+
+        <form action="/register" method="POST">
+            <!-- 1. Họ tên đầy đủ (FullName) -->
+            <div class="mb-3">
+                <label class="form-label">Họ và Tên</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                    <input type="text" name="fullname" class="form-control" placeholder="Nhập đầy đủ họ tên" required>
+                </div>
+            </div>
+
+            <!-- 2. Số điện thoại (Phone) & Ngày sinh (BirthDate) -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Số điện thoại</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                        <input type="tel" name="phone" class="form-control" placeholder="09xxxxxxxx" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Ngày tháng năm sinh</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                        <input type="date" name="birthdate" class="form-control" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="py-2"><hr class="text-muted opacity-25"></div>
+
+            <!-- 3. Tên đăng nhập (Username) & Mật khẩu (Password) -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Tên tài khoản</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                        <input type="text" name="username" class="form-control" placeholder="Username" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Mật khẩu</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-key"></i></span>
+                        <input type="password" name="password" class="form-control" placeholder="Password" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Mã mời bảo mật (Invite Code) -->
+            <div class="invite-section">
+                <label class="form-label text-primary">Nhập mã mời bảo mật</label>
+                <div class="input-group">
+                    <span class="input-group-text border-primary text-primary"><i class="fas fa-fingerprint"></i></span>
+                    <input type="text" name="invite_code" class="form-control border-primary" placeholder="Mã định danh hệ thống" required>
+                </div>
+                <p class="text-muted mt-2 mb-0" style="font-size: 0.65rem;">
+                    <i class="fas fa-shield-halved me-1"></i> Mã này xác định **RoleID**trong hệ thống **LH_AUTX**.
+                </p>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 shadow">Xác nhận tạo hồ sơ nhân viên</button>
+
+            <div class="text-center mt-4">
+                <span class="small text-muted">Đã có tài khoản kỹ thuật?</span> 
+                <a href="/login" class="text-primary fw-bold text-decoration-none small ms-1">Đăng nhập ngay</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

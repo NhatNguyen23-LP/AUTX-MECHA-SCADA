@@ -28,7 +28,7 @@ const sqlConfig = {
         type: 'default',
         options: {
             userName: 'NhatLPN23_SQLLogin_1',
-            password: '' // 🌟 Dán mật khẩu ní copy trên web Somee vô đây
+            password: '7ap8sb7rwb' // 🌟 Dán mật khẩu ní copy trên web Somee vô đây
         }
     },
     server: 'MechaSCADA_V2.mssql.somee.com',

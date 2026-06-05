@@ -41,7 +41,7 @@ const sqlConfig = {
     }
 };
 
-// ✅ 3. TẠO HÀM GIẢ LẬP ĐỂ GIỮ NGUYÊN CÁC LỆNH .request().query() CŨ CỦA NHẬT (BẢN FIX CHỐNG MẤT DATA)
+// ✅ 3. TẠO HÀM GIẢ LẬP ĐỂ GIỮ NGUYÊN CÁC LỆNH .request().query() CŨ CỦA NHẬT (BẢN FIX CHỐNG NGHẼN THAM SỐ)
 const poolPromise = new Promise((resolve, reject) => {
     const connection = new sql.Connection(sqlConfig);
     connection.on('connect', err => {
@@ -51,12 +51,12 @@ const poolPromise = new Promise((resolve, reject) => {
         } else {
             console.log('✅ LH_AUTX: Hệ thống đã thông mạch SQL Server Cloud!');
             
-            // Bộ chuyển đổi thích nghi Master xử lý mượt mà cả query thuần lẫn query có tham số
+            // Bộ chuyển đổi thích nghi Master làm sạch tham số cục bộ trên từng Request độc lập
             const requestAdapter = () => {
-                let params = []; 
+                let localParams = []; // Tạo mảng tham số cô lập hoàn toàn cho riêng request này
                 return {
                     input: function(name, type, val) { 
-                        params.push({ name, val }); 
+                        localParams.push({ name, val }); 
                         return this; 
                     },
                     query: function(sqlStr) {
@@ -72,7 +72,6 @@ const poolPromise = new Promise((resolve, reject) => {
                             let req = new sql.Request(sqlStr, (err, rowCount, rows) => {
                                 if (err) return rejQ(err);
                                 let recordset = [];
-                                // Kiểm tra nếu có dữ liệu hàng trả về thì mới thực hiện map, tránh bị đứng hình giao diện
                                 if (rows) {
                                     recordset = rows.map(row => {
                                         let obj = {};
@@ -83,16 +82,19 @@ const poolPromise = new Promise((resolve, reject) => {
                                 resQ({ recordset });
                             });
                             
-                            // Nạp các tham số động nếu hệ thống gọi qua hàm .input()
-                            if (params && params.length > 0) { 
-                                params.forEach(p => req.addParameter(p.name, sql.TYPES.NVarChar, p.val)); 
+                            // Chỉ nạp tham số nếu câu lệnh này thực sự gọi qua hàm .input()
+                            if (localParams && localParams.length > 0) { 
+                                localParams.forEach(p => req.addParameter(p.name, sql.TYPES.NVarChar, p.val)); 
                             }
+                            
                             connection.execSql(req);
                         });
                     }
                 };
             };
-            resolve({ request: requestAdapter });
+            
+            // Ép đối tượng trả về luôn sinh ra một instance Adapter sạch sẽ khi gọi .request()
+            resolve({ request: () => requestAdapter() });
         }
     });
     connection.connect();
@@ -267,9 +269,14 @@ app.post('/api/iot/sensor-data', async (req, res) => {
 
 // --- 7. API Admin & Lịch trực ---
 app.get('/api/admin/users', async (req, res) => {
-    const pool = await poolPromise;
-    const result = await pool.request().query("SELECT CAST(u.UserID AS VARCHAR(36)) as id, u.FullName as fullname, u.Username as username, r.RoleName as role FROM Users u JOIN Roles r ON u.RoleID = r.RoleID");
-    res.json(result.recordset);
+    try {
+        const pool = await poolPromise; 
+        const result = await pool.request().query("SELECT CAST(u.UserID AS VARCHAR(36)) as id, u.FullName as fullname, u.Username as username, r.RoleName as role FROM Users u JOIN Roles r ON u.RoleID = r.RoleID");
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("❌ LỖI LẤY USER:", err.message);
+        res.json([]);
+    }
 });
 
 app.post('/api/admin/add-week', async (req, res) => {
@@ -374,9 +381,14 @@ app.post('/api/maintenance/update-status', async (req, res) => {
 });
 
 app.get('/api/admin/invite-codes', async (req, res) => {
-    const pool = await poolPromise;
-    const result = await pool.request().query("SELECT ic.Code as code, r.RoleName as role FROM InviteCodes ic JOIN Roles r ON ic.RoleID = r.RoleID");
-    res.json(result.recordset);
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT ic.Code as code, r.RoleName as role FROM InviteCodes ic JOIN Roles r ON ic.RoleID = r.RoleID");
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("❌ LỖI LẤY MÃ MỜI:", err.message);
+        res.json([]);
+    }
 });
 
 app.delete('/api/admin/delete-user/:id', async (req, res) => {

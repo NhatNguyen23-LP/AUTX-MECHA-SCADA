@@ -267,14 +267,9 @@ app.post('/api/iot/sensor-data', async (req, res) => {
 
 // --- 7. API Admin & Lịch trực ---
 app.get('/api/admin/users', async (req, res) => {
-    try {
-        const pool = await poolPromise; // Lấy bộ Request Adapter đã resolve
-        const result = await pool.request().query("SELECT CAST(u.UserID AS VARCHAR(36)) as id, u.FullName as fullname, u.Username as username, r.RoleName as role FROM Users u JOIN Roles r ON u.RoleID = r.RoleID");
-        res.json(result.recordset);
-    } catch (err) {
-        console.error("❌ LỖI LẤY USER:", err.message);
-        res.json([]);
-    }
+    const pool = await poolPromise;
+    const result = await pool.request().query("SELECT CAST(u.UserID AS VARCHAR(36)) as id, u.FullName as fullname, u.Username as username, r.RoleName as role FROM Users u JOIN Roles r ON u.RoleID = r.RoleID");
+    res.json(result.recordset);
 });
 
 app.post('/api/admin/add-week', async (req, res) => {
@@ -379,14 +374,9 @@ app.post('/api/maintenance/update-status', async (req, res) => {
 });
 
 app.get('/api/admin/invite-codes', async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query("SELECT ic.Code as code, r.RoleName as role FROM InviteCodes ic JOIN Roles r ON ic.RoleID = r.RoleID");
-        res.json(result.recordset);
-    } catch (err) {
-        console.error("❌ LỖI LẤY MÃ MỜI:", err.message);
-        res.json([]);
-    }
+    const pool = await poolPromise;
+    const result = await pool.request().query("SELECT ic.Code as code, r.RoleName as role FROM InviteCodes ic JOIN Roles r ON ic.RoleID = r.RoleID");
+    res.json(result.recordset);
 });
 
 app.delete('/api/admin/delete-user/:id', async (req, res) => {
